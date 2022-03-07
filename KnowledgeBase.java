@@ -25,23 +25,29 @@ public class KnowledgeBase {
   }
 
   /**
-   * Sets up the knowledge base by creating every unblocked cell on the board
-   * and adding them to the unknownCells list.
-   * @param b board
-   */
+  * Sets up the knowledge base by creating every unblocked cell on the board
+  * and adding them to the unknownCells list.
+  * @param b board
+  */
   private void setUpKnowledgeBase(char[][] b) {
 
     int size = b.length;
-    int middle = size/2 ;
+    int middle = size/2 ;//+ size % 2;
+
+
+     unknownCells.add(new Cell(0, 0));
+     unknownCells.add(new Cell(middle, middle));
 
     for (int i = 0; i < size; i++) {
-			for (int j = 0; j < size; j++) {
-  			if (b[i][j] != 'b') {
-					unknownCells.add(new Cell(i, j));
+      for (int j = 0; j < size; j++) {
+         if (b[i][j] != 'b' & !(i == 0 & j == 0) & !(i == middle & j == middle)) {
+//        if (b[i][j] != 'b') {
+          unknownCells.add(new Cell(i, j));
+        }
+      }
+    }
 
-				}
-			}
-		}
+
   }
 
   // GET CELL METHODS
@@ -51,14 +57,12 @@ public class KnowledgeBase {
    * @return Next cell
    */
   public Cell getNextCell() {
-
     if (unknownCells.isEmpty()) {
       return null;
     } else {
       Cell temp = unknownCells.getFirst();
       return temp;
     }
-
   }
 
   /**
@@ -68,14 +72,12 @@ public class KnowledgeBase {
    * @return   Cell
    */
   public Cell getUnknownCell(int x, int y) {
-
     for (Cell temp : unknownCells) {
         if (temp.getX() == x & temp.getY() == y) {
           return temp;
         }
      }
      return null;
-
   }
 
   /**
@@ -85,14 +87,215 @@ public class KnowledgeBase {
    * @return   Cell
    */
   public Cell getUncoveredCell(int x, int y) {
-
     for (Cell temp : uncoveredCells) {
         if (temp.getX() == x & temp.getY() == y) {
           return temp;
         }
      }
      return null;
+  }
 
+  public Cell getFlaggedCell(int x, int y) {
+    for (Cell temp : flaggedCells) {
+      if (temp.getX() == x & temp.getY() == y) {
+        return temp;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Get all the uncovered neigbours of the given cell.
+   * @param  cell Given cell.
+   * @return      List of all uncovered neighbours of the cell.
+   */
+  public LinkedList<Cell> getUncoveredAdjacentNeighbours(Cell cell) {
+
+    int x = cell.getX();
+    int y = cell.getY();
+
+    LinkedList<Cell> temp = new LinkedList<Cell>();
+
+    if (x != 0 & y != 0) {
+      if (getUncoveredCell(x-1, y-1) != null) {temp.add(getUncoveredCell(x-1, y-1));}
+    }
+
+    if (y != 0) {
+      if (getUncoveredCell(x, y-1) != null) {temp.add(getUncoveredCell(x, y-1));}
+    }
+
+    if (x != gridSize & y != 0) {
+      if (getUncoveredCell(x+1, y-1) != null) {temp.add(getUncoveredCell(x+1, y-1));}
+    }
+
+    if (x != 0) {
+      if (getUncoveredCell(x-1, y) != null) {temp.add(getUncoveredCell(x-1, y));}
+    }
+
+    if (x != gridSize) {
+      if (getUncoveredCell(x+1, y) != null) {temp.add(getUncoveredCell(x+1, y));}
+    }
+
+    if (x != 0 & y != gridSize) {
+      if (getUncoveredCell(x-1, y+1) != null) {temp.add(getUncoveredCell(x-1, y+1));}
+    }
+
+    if (y != gridSize) {
+      if (getUncoveredCell(x, y+1) != null) {temp.add(getUncoveredCell(x, y+1));}
+    }
+
+    if (x != gridSize & y != gridSize) {
+      if (getUncoveredCell(x+1, y+1) != null) {temp.add(getUncoveredCell(x+1, y+1));}
+    }
+
+    return temp;
+
+  }
+
+  /**
+   * Get all the unkown neigbours of the given cell.
+   * @param  cell Given cell.
+   * @return      List of all unknown neighbours of the cell.
+   */
+  public LinkedList<Cell> getUnkownAdjacentNeighbours(Cell cell) {
+
+    int x = cell.getX();
+    int y = cell.getY();
+
+    LinkedList<Cell> temp = new LinkedList<Cell>();
+
+    if (x != 0 & y != 0) {
+      if (getUnknownCell(x-1, y-1) != null) {temp.add(getUnknownCell(x-1, y-1));}
+    }
+
+    if (y != 0) {
+      if (getUnknownCell(x, y-1) != null) {temp.add(getUnknownCell(x, y-1));}
+    }
+
+    if (x != gridSize & y != 0) {
+      if (getUnknownCell(x+1, y-1) != null) {temp.add(getUnknownCell(x+1, y-1));}
+    }
+
+    if (x != 0) {
+      if (getUnknownCell(x-1, y) != null) {temp.add(getUnknownCell(x-1, y));}
+    }
+
+    if (x != gridSize) {
+      if (getUnknownCell(x+1, y) != null) {temp.add(getUnknownCell(x+1, y));}
+    }
+
+    if (x != 0 & y != gridSize) {
+      if (getUnknownCell(x-1, y+1) != null) {temp.add(getUnknownCell(x-1, y+1));}
+    }
+
+    if (y != gridSize) {
+      if (getUnknownCell(x, y+1) != null) {temp.add(getUnknownCell(x, y+1));}
+    }
+
+    if (x != gridSize & y != gridSize) {
+      if (getUnknownCell(x+1, y+1) != null) {temp.add(getUnknownCell(x+1, y+1));}
+    }
+
+    return temp;
+
+  }
+
+  public LinkedList<Cell> getUnkownOrFlaggedAdjacentNeighbours(Cell cell) {
+
+    int x = cell.getX();
+    int y = cell.getY();
+
+    LinkedList<Cell> temp = new LinkedList<Cell>();
+
+    if (x != 0 & y != 0) {
+      if (getUnknownCell(x-1, y-1) != null) {
+        temp.add(getUnknownCell(x-1, y-1));
+      }
+      if (getFlaggedCell(x-1, y-1) != null) {
+        temp.add(getFlaggedCell(x-1, y-1));
+      }
+    }
+
+    if (y != 0) {
+      if (getUnknownCell(x, y-1) != null) {
+        temp.add(getUnknownCell(x, y-1));
+      }
+      if (getFlaggedCell(x, y-1) != null) {
+        temp.add(getFlaggedCell(x, y-1));
+      }
+    }
+
+    if (x != gridSize & y != 0) {
+      if (getUnknownCell(x+1, y-1) != null) {
+        temp.add(getUnknownCell(x+1, y-1));
+      }
+      if (getFlaggedCell(x+1, y-1) != null) {
+        temp.add(getFlaggedCell(x+1, y-1));
+      }
+    }
+
+    if (x != 0) {
+      if (getUnknownCell(x-1, y) != null) {
+        temp.add(getUnknownCell(x-1, y));
+      }
+      if (getFlaggedCell(x-1, y)!= null) {
+        temp.add(getFlaggedCell(x-1, y));
+      }
+    }
+
+    if (x != gridSize) {
+      if (getUnknownCell(x+1, y) != null) {
+        temp.add(getUnknownCell(x+1, y));
+      }
+      if (getFlaggedCell(x+1, y) != null) {
+        temp.add(getFlaggedCell(x+1, y));
+      }
+    }
+
+    if (x != 0 & y != gridSize) {
+      if (getUnknownCell(x-1, y+1) != null) {
+        temp.add(getUnknownCell(x-1, y+1));
+      }
+      if (getFlaggedCell(x-1, y+1) != null) {
+        temp.add(getFlaggedCell(x-1, y+1));
+      }
+    }
+
+    if (y != gridSize) {
+      if (getUnknownCell(x, y+1) != null) {
+        temp.add(getUnknownCell(x, y+1));
+      }
+      if (getFlaggedCell(x, y+1) != null) {
+        temp.add(getFlaggedCell(x, y+1));
+      }
+    }
+
+    if (x != gridSize & y != gridSize) {
+      if (getUnknownCell(x+1, y+1) != null) {
+        temp.add(getUnknownCell(x+1, y+1));
+      }
+      if (getFlaggedCell(x, y-1) != null) {
+        temp.add(getFlaggedCell(x, y-1));
+      }
+    }
+
+    return temp;
+  }
+
+  /**
+   * Get the list of all non-zero uncovered cells.
+   * @return  List of all non-zero uncovered cells.
+   */
+  public LinkedList<Cell> getNonZeroUncoveredCells() {
+
+    LinkedList<Cell> temp = new LinkedList<Cell>();
+
+    for (Cell uncoveredCell : uncoveredCells) {
+      if (Character.getNumericValue(uncoveredCell.getChar()) != 0) {
+        temp.add(uncoveredCell);
+      }
+    }
+    return temp;
   }
 
   // EDIT KNOWLEDGE BASE LISTS METHODS
@@ -139,7 +342,7 @@ public class KnowledgeBase {
    */
   public void printKnowledgeBase() {
 
-    System.out.println("unknownCells: "  + llToString(unknownCells));
+    System.out.println("\nunknownCells: "  + llToString(unknownCells));
     System.out.println("flaggedCells: "  + llToString(flaggedCells));
     System.out.println("uncoveredCells: "  + llToString(uncoveredCells));
 

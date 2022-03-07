@@ -1,6 +1,21 @@
+import org.logicng.formulas.Variable;
+import org.logicng.formulas.Literal;
+import org.logicng.formulas.FormulaFactory;
+import org.logicng.formulas.Formula;
+import org.logicng.datastructures.Assignment;
+import org.logicng.datastructures.Tristate;
+import org.logicng.io.parsers.*;
+import org.logicng.solvers.MiniSat;
+import org.logicng.solvers.SATSolver;
+import java.util.Collections;
+import java.util.ArrayList;
+import java.util.List;
+
+import java.util.LinkedList;
+
 public class Agent {
 
-	static final boolean DEBUG = false;	// Print debugging information
+	static final boolean DEBUG = true;	// Print debugging information
 	private char[][] board;							// Board
 	private int gridSize;								// Size of board
 	private int middleCoord;						// Middle coordinate of the board
@@ -23,7 +38,7 @@ public class Agent {
 			case "P2":
 				beginnerAgent();
 			case "P3":
-				//TODO: Part 3
+				intermediateAgent();
 			case "P4":
 				//TODO: Part 4
 			case "P5":
@@ -144,7 +159,7 @@ public class Agent {
 				} else if (repeatCell == nextCell){
 
 					// Last check that we are finished.
-					beginnerAgentFinished();
+					agentFinished();
 				}
 
 			// If we have managed to edit a cell set repeatCell to null.
@@ -160,9 +175,278 @@ public class Agent {
 		// If we get here then unknownCells in the knowledge base has ran out. This
 		// method is used to see if we have one the game or are stuck before
 		// ending the game.
-		beginnerAgentFinished();
+		agentFinished();
 
 	}
+
+	private void intermediateAgent() {
+
+		// Used to catch when agent not terminated and prevent infinite loops
+		Cell repeatCell = null;
+
+		// Get the next unknown cell from the knowledge base
+		Cell nextCell = kb.getNextCell();
+
+		// For every unknown cell, check if the kb entails the cell is a mine or is safe, and probe or mark
+		// respectively. If we don't know, move it to the end of the queue and try the next unknown cell.
+		while (nextCell != null) {
+
+			// Used to test when a cell has been updated or marked
+			boolean edited = false;
+
+			// Print information
+			if (verbose & repeatCell == null) {A2main.printBoard(board);}
+			if (DEBUG) {kb.printKnowledgeBase();}
+			if (DEBUG) {System.out.println("\nnextCell = " + nextCell);}
+
+			// If cell is 0,0 or middle cell we know it is safe so we can probe it immediately
+			if ((nextCell.getX() == 0 & nextCell.getY() == 0) | (nextCell.getX() == middleCoord & nextCell.getY() == middleCoord))  {
+				probeCell(nextCell);					// Probe this cell
+				nextCell = kb.getNextCell();			// Get the next cell
+				continue;								// Repeat while loop
+			}
+
+			// Construct the knowledge base for all unknownCells next to an uncovered cell
+			String knowldegeBase = constructKB();
+			if (DEBUG) {System.out.println("\tKB = " + knowldegeBase);}
+
+			// If knowledge base is empty then finish
+			if (knowldegeBase.length() == 0) {basicAgentFinished();}
+
+			// Find if the cell is safe, if so probe it
+			boolean cellSafe = isCellSafe(knowldegeBase, nextCell);
+
+			// Find if the cell has a mine, if so mark it
+			boolean cellMine = isCellMine(knowldegeBase, nextCell);
+
+			// If the cell has not been edited (marked or uncovered), move it to the
+			// end of the unknownCells list in the knowledge base to be re-done later.
+			// If we have looped all the way round the unknownCells list without ever
+			// editing anything we know we are stuck so finish.
+			if (!(cellSafe | cellMine)) {	// Cell has not been edited (marked or uncovered)
+
+				kb.moveCellToEndOfQueue(nextCell); // Move cell to end of queue
+				if (DEBUG) {System.out.println("Moved cell " + nextCell + " to end of queue");}
+
+				if (repeatCell == null) {repeatCell = nextCell; // Set repeat cell to nextCell
+
+				} else if (repeatCell == nextCell){agentFinished();} // If we looped round without editing any cells - end
+
+			} else {repeatCell = null;} // If we have managed to edit a cell set repeatCell to null.
+
+			// Get the next cell from the knowledge base
+			nextCell = kb.getNextCell();
+		}
+
+		// If we get here then unknownCells in the knowledge base has ran out. This
+		// method is used to see if we have one the game or are stuck before
+		// ending the game.
+		agentFinished();
+
+	}
+
+	// INTERMEDIATE AGENT METHODS //
+
+	/**
+	 * Check if the knowledge base entails that the cell is safe.
+	 * @param kb	Knowledge base
+	 * @param cell	Cell to test
+	 * @return		True or false if the cell is safe to be uncovered
+	 */
+	public boolean isCellSafe(String kb, Cell cell) {
+
+		// Get the ID of the cell
+		int cellID = ((cell.getX() * gridSize) + (cell.getY() + cell.getX()) + 1);
+
+		// Set the  proposition string
+		String entailSafe = kb + " & " + cellID;
+
+		// Use entailment to check if the cell is safe
+		boolean isSatisfiedSafe = false;
+		try {
+			isSatisfiedSafe = isSATSatisfied(entailSafe);
+		} catch (ParserException e) {
+			e.printStackTrace();
+		}
+		System.out.println("\tSafe: " + isSatisfiedSafe);
+
+		// If the cell is entailed to be safe, probe the cell
+		if (isSatisfiedSafe) {
+			probeCell(cell);
+		}
+
+		return isSatisfiedSafe;
+	}
+
+	/**
+	 * Check if the knowledeg base entails that the cell contains a mine.
+	 * @param kb	Knowledge base
+	 * @param cell	Cell to check
+	 * @return		True or false if the cell contains a mine
+	 */
+	public boolean isCellMine(String kb, Cell cell) {
+
+		// Get the ID of the cell
+		int cellID = ((cell.getX() * gridSize) + (cell.getY() + cell.getX()) + 1);
+
+		// Set the  proposition string
+		String entailmentMine = kb + " & ~" + cellID;
+
+		// Use entailment to check if the cell contains a mine
+		boolean isSatisfiedMine = false;
+		try {
+			isSatisfiedMine = isSATSatisfied(entailmentMine);
+		} catch (ParserException e) {
+			e.printStackTrace();
+		}
+		System.out.println("\tMine: " + isSatisfiedMine);
+
+		// If the cell contains a mine, mark it
+		if (isSatisfiedMine) {
+			markCell(cell);
+		}
+
+		return isSatisfiedMine;
+	}
+
+	/**
+	 * Solve a given string using the SAT sovler.
+	 * @param str	String to sovle
+	 * @return		True or false if the sentance is satisfiable
+	 * @throws ParserException
+	 */
+	public boolean isSATSatisfied(String str) throws ParserException {
+
+		FormulaFactory f = new FormulaFactory();
+		PropositionalParser p = new PropositionalParser(f);
+		Formula formula = p.parse(str);
+		SATSolver miniSat = MiniSat.miniSat(f);
+		miniSat.add(formula);
+		Tristate result = miniSat.sat();
+		return result.toString().equals("FALSE");
+	}
+
+	/**
+	 * Construct the knowledge base of all the unknown cells (next to uncovered neighbours).
+	 * @return
+	 */
+	public String constructKB() {
+
+		// Linked list holding each unknown cell's logic representation
+		List<String> knowledgeBase = new ArrayList<>();
+
+		// For every uncovered cell that is not a zero
+		for (Cell uncoveredCell : kb.getNonZeroUncoveredCells()) {
+
+			// Get the list of covered neighbours for the uncoveredCell
+			LinkedList<Cell> coveredNeighbours = kb.getUnkownAdjacentNeighbours(uncoveredCell);
+
+			// If uncovered cell has no covered neighbours move to next uncovered cell
+			if (coveredNeighbours.size() == 0) {continue;}
+
+			// Get the num of unknown (?) neighbours of the uncovered cell (cell value - #markedNeigbours)
+			int numOfUnknownNeighbours = Character.getNumericValue(uncoveredCell.getChar()) - numberOfCInAdjacent(uncoveredCell, '*');
+
+			// Get a list of the cellID's of the neighbours
+			LinkedList<Integer> coveredNeighboursID = new LinkedList<>();
+			for (Cell coveredNeighbour : coveredNeighbours) {
+				int cellID = ((coveredNeighbour.getX() * gridSize) + (coveredNeighbour.getY() + coveredNeighbour.getX()) + 1);
+
+				// Check that the cellID is not already in the list
+				boolean alreadyInCovNeighID = false;
+				for (Integer c : coveredNeighboursID) {
+					if (c == cellID) {
+						alreadyInCovNeighID = true;
+						break;
+					}
+				}
+
+				// Add cellID to list if it is not already in there
+				if (!alreadyInCovNeighID) {
+					coveredNeighboursID.add(cellID);
+				}
+			}
+
+			// Create a list to hold all the combinations in
+			List<String> combinations = new ArrayList<>();
+
+			// Find all the combinations of the elements in coveredNeighboursID
+			helper(combinations, coveredNeighboursID, new ArrayList<>(), 0, coveredNeighboursID.size() - 1, 0, numOfUnknownNeighbours);
+
+			// Concat all the combinations together separated by a "|"
+			String cellRepresentation = concatLinkedList(combinations, " | ");
+
+			// Add the string to the knowledge base LinkedList
+			knowledgeBase.add(cellRepresentation);
+		}
+
+		// Concat all the uncovered cell's logical representation together separated by a "&"
+		return concatLinkedList(knowledgeBase, " & ");
+
+	}
+
+	/**
+	 * Find all possible combinations of coveredNeighboursID.
+	 * @param combinations			List of combinations
+	 * @param coveredNeighboursID	List of the IDs of neighbouring covered cells
+	 * @param data					Holder array
+	 * @param start					Start
+	 * @param end					End
+	 * @param index					Index of location in coveredNeighbours
+	 * @param numOfMines			Number of mines for the given cell
+	 */
+	public void helper(List<String> combinations, List<Integer> coveredNeighboursID, List<String> data, int start, int end, int index, int numOfMines) {
+
+		if (index == numOfMines) { // Current combination can be printed so print it
+			for (int j = start; j <= end; j++) {
+				data.add("~" + coveredNeighboursID.get(j).toString());
+			}
+			String clause = String.join(" & ", data);
+			combinations.add(clause);
+		} else {
+			for (int i = start; i <= end && end - i + 1 >= numOfMines - index; i++) {
+				List<String> dataCpy = new ArrayList<>(data);
+				for (int j = start; j < i; j++) {
+					dataCpy.add("~" + coveredNeighboursID.get(j).toString());
+				}
+				dataCpy.add(coveredNeighboursID.get(i).toString());
+				helper(combinations, coveredNeighboursID, dataCpy, i + 1, end, index + 1, numOfMines);
+			}
+		}
+	}
+
+	/**
+	 * Concatenate the elements of a linked list in brackets and seperated by the joiningString
+	 * @param list - List to concat
+	 * @param joiningString - String in the middle of each element in the list
+	 * @return
+	 */
+	public String concatLinkedList(List<String> list, String joiningString) {
+
+		StringBuilder sb = new StringBuilder();
+
+		for (String element : list) {
+
+			// Error checking if element is empty
+			if (element.equals("")) {continue;}
+
+			// Add element in brackets with joining string on the end
+			sb.append("(" + element + ")" + joiningString);
+
+		}
+
+		// Remove the last joining string
+		if (sb.length() > joiningString.length() && sb.substring(sb.length() - joiningString.length(), sb.length()).equals(joiningString)) {
+			sb.delete(sb.length() - joiningString.length(), sb.length());
+		}
+
+		return sb.toString();
+	}
+
+
+
+
+
 
 	/**
 	 * Probe the given cell. If it is a mine end the game, else update the cell
@@ -462,7 +746,7 @@ public class Agent {
 	 * Count if there are still uncovered cells in the board to test if we have
 	 * solved the game or are stuck, then end the game.
 	 */
-	private void beginnerAgentFinished() {
+	private void agentFinished() {
 
 		// Loop through the board. If we find a '?' (uncovered cell), we know we
 		// have not finished the game so failed = true.
